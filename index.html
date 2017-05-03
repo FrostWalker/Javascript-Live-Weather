@@ -1,0 +1,152 @@
+<!DOCTYPE html>
+<html lang="en" class="no-js">
+<head>
+    <meta charset="UTF-8" />
+    <meta http-equiv="Content-Type" content="text/html; charset=UTF-8">
+    <meta http-equiv="X-UA-Compatible" content="IE=edge">
+    <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=0">
+    <meta name="description" content="" />
+    <meta name="keywords" content="" />
+    <meta name="author" content="" />
+
+    <title>Live Weather</title>
+
+    <link rel="shortcut icon" href="favicon.ico">
+
+    <link rel="stylesheet" type="text/css" href="css/normalise.css" />
+    <link rel="stylesheet" type="text/css" href="css/style.css" />
+
+    <!--[if IE]><script src="js/html5shiv.min.js"></script><![endif]-->
+
+    <script type="application/javascript" src="js/jquery.min.js"></script>
+
+    <script type="application/javascript" src="js/background-blur.min.js"></script>
+
+    <script type="application/javascript" src="js/weather.js"></script>
+
+    <script type="application/javascript">
+
+        var timeoffset = 0;
+
+        function fetch() {
+            if (navigator.geolocation) navigator.geolocation.getCurrentPosition(display);
+        }
+
+        function display(pos) {
+            var json;
+
+            $.get("background.php?lat="+pos.coords.latitude+"&lon="+pos.coords.longitude, function(data) {
+                $('#background').backgroundBlur({
+                    imageURL : data,
+                    blurAmount : 5,
+                    imageClass : 'bg-blur',
+                    duration: 1000,
+                    endOpacity : 1
+                });
+            });
+
+            $.get("weather.php?lat="+pos.coords.latitude+"&lon="+pos.coords.longitude, function(data) {
+                json = $.parseJSON(data);
+                $('#gps')[0].innerHTML = JSON.stringify(json);
+                $('#city').text(json.city);
+                var d = new Date();
+                $('#currenttime').text(d.getHours() + ":" + addZero(d.getMinutes()));
+                $('#temperature').text(json.weather.temperature);
+                $('#wind').text(json.forecast[json.time].windSpeed + " knots " + json.forecast[json.time].windDir);
+                $('#rainfreq').val(parseInt(json.forecast[json.time].rainFall * 200));
+                document.dispatchEvent(new CustomEvent("updateWeather"));
+
+
+                var wList = $('#slidingcontent')
+                $.each(json.forecast, function(i)
+                {
+                    var one = $('<div/>')
+                        .addClass('weather')
+                        .appendTo(wList);
+                    var two = $('<div/>')
+                        .addClass('icon')
+                        .attr('data-weather', 'sunny')
+                        .appendTo(one);
+                    var three = $('<div/>')
+                        .addClass('time')
+                        .text(json.forecast[i].timeFrom)
+                        .appendTo(one);
+                    var four = $('<div/>')
+                        .addClass('temp')
+                        .text(json.forecast[i].temperature)
+                        .appendTo(one);
+                });
+
+                timeoffset = json.forecast.length * 50 - (json.time+1) * 100;
+                $('#slidingcontent').css('width', json.forecast.length * 100);
+                $('#slidingcontent').css('left', 0 + timeoffset);
+            });
+
+            function addZero(i) {
+                if (i < 10) {
+                    i = "0" + i;
+                }
+                return i;
+            }
+        }
+
+        fetch();
+
+        var startx = 0, newvalue = 0, value = 0;
+        document.addEventListener('touchstart', function(e) {
+            e.preventDefault();
+            var touch = e.touches[0];
+            startx = touch.pageX;
+        }, false);
+        document.addEventListener('touchmove', function(e) {
+            e.preventDefault();
+            var touch = e.touches[0];
+            newvalue = value - (startx - touch.pageX);
+            if((newvalue + timeoffset) > ($('#slidingcontent').width() / 2))
+                newvalue = ($('#slidingcontent').width() / 2) - timeoffset;
+            if((newvalue + timeoffset) < -($('#slidingcontent').width() / 2))
+                newvalue = -($('#slidingcontent').width() / 2) - timeoffset;
+            $('#slidingcontent').css('left', newvalue + timeoffset);
+            $('#rainfreq').val(parseInt(newvalue * -5));
+            document.dispatchEvent(new CustomEvent("updateWeather"));
+        }, false);
+        document.addEventListener('touchend', function(e) {
+            e.preventDefault();
+            var touch = e.touches[0];
+            value = newvalue;
+        }, false);
+    </script>
+</head>
+<body>
+<div id="background"></div>
+<canvas width="1" height="1" id="weather_canvas" data-weather="storm" data-frequency="2000" data-angle="90" data-speed="100"></canvas>
+
+<div id="weather_overlay">
+    <div id="city"></div>
+    <div id="currenttime"></div>
+    <div id="weathericon" data-weather="sunny"></div>
+    <div id="temperature">16°C</div>
+    <div id="wind">12 knots NE</div>
+    <div id="timeslider">
+        <div id="slidingcontent">
+
+        </div>
+    </div>
+</div>
+<div id="debug">
+    <pre id="gps"></pre>
+    <div class="slider">
+        <p>Density : <span id="frequency"></span></p>
+        <input type="range" name="rainfreq" id="rainfreq" value="0" min="0" max="8000" data-show-value="true" data-popup-enabled="true" data-highlight="true" />
+    </div>
+    <div class="slider">
+        <p>Angle : <span id="rotation"></span></p>
+        <input type="range" name="rainangl" id="rainangl" value="90" min="45" max="135" data-show-value="true" data-popup-enabled="true" data-highlight="true" />
+    </div>
+    <div class="slider">
+        <p>Speed : <span id="speed"></span></p>
+        <input type="range" name="rainspeed" id="rainspeed" value="100" min="0" max="200" data-show-value="true" data-popup-enabled="true" data-highlight="true" />
+    </div>
+</div>
+</body>
+</html>
